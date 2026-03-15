@@ -2,10 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user.entity';
+import { Activity } from '../../activities/activity.entity';
+import { Territory } from '../../territories/territory.entity';
 
 @Injectable()
 export class UserService {
-  constructor(@InjectRepository(User) private readonly userRepo: Repository<User>) {}
+  constructor(
+    @InjectRepository(User)     private readonly userRepo:      Repository<User>,
+    @InjectRepository(Activity) private readonly activityRepo:  Repository<Activity>,
+    @InjectRepository(Territory) private readonly territoryRepo: Repository<Territory>,
+  ) {}
 
   async upsertFromStrava(stravaData: {
     athlete: { id: number; firstname: string; lastname: string; profile: string };
@@ -57,5 +63,41 @@ export class UserService {
 
   async findAll(): Promise<User[]> {
     return this.userRepo.find();
+  }
+
+  // DSGVO Art. 17 — Recht auf Löschung
+  async deleteAccount(userId: number): Promise<void> {
+    await this.activityRepo.delete({ userId });
+    await this.territoryRepo.delete({ userId });
+    await this.userRepo.delete(userId);
+  }
+
+  // DSGVO Art. 20 — Recht auf Datenübertragbarkeit
+  async exportData(userId: number): Promise<object> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const activities = await this.activityRepo.find({ where: { userId } });
+    const territory = await this.territoryRepo.findOne({ where: { userId } });
+    return {
+      exportedAt: new Date().toISOString(),
+      profile: {
+        id: user?.id,
+        firstname: user?.firstname,
+        lastname: user?.lastname,
+        stravaId: user?.stravaId,
+        createdAt: user?.createdAt,
+      },
+      activities: activities.map((a) => ({
+        name: a.name,
+        sportType: a.sportType,
+        distance: a.distance,
+        movingTime: a.movingTime,
+        elevationGain: a.elevationGain,
+        startDate: a.startDate,
+        qualifying: a.qualifying,
+      })),
+      territory: territory
+        ? { tileCount: territory.tileCount, areaKm2: territory.areaKm2 }
+        : null,
+    };
   }
 }

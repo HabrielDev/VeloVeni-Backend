@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -12,12 +14,12 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { User } from './users/user.entity';
 import { Activity } from './activities/activity.entity';
 import { Territory } from './territories/territory.entity';
+import { TileCrossing } from './territories/tile-crossing.entity';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]), // 60 requests per minute
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -36,8 +38,8 @@ import { Territory } from './territories/territory.entity';
           username: configService.get('DB_USERNAME'),
           password: configService.get('DB_PASSWORD'),
           database: configService.get('DB_DATABASE'),
-          entities: [User, Activity, Territory],
-          synchronize: false, // Setze auf true für Entwicklung
+          entities: [User, Activity, Territory, TileCrossing],
+          synchronize: true,
         };
       },
       inject: [ConfigService],
@@ -49,6 +51,9 @@ import { Territory } from './territories/territory.entity';
     LeaderboardModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
