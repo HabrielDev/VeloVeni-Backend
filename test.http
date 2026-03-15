@@ -1,0 +1,9 @@
+### Test GET Request to Backend
+GET http://localhost:3002/
+
+### Test with JSON Response (if applicable)
+GET http://localhost:3002/
+Accept: application/json
+
+### Swagger UI
+GET http://localhost:3002/api
