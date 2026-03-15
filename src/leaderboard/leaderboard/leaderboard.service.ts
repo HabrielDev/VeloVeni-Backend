@@ -30,7 +30,7 @@ export class LeaderboardService {
           profilePicture: t.user?.profilePicture ?? '',
           color: t.color,
           tileCount: t.tileCount,
-          areaKm2: Number(t.areaKm2.toFixed(1)),
+          areaKm2: Number((t.areaKm2 ?? 0).toFixed(1)),
           routeCount,
         };
       }),

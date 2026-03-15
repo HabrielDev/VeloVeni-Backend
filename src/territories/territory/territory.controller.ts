@@ -27,6 +27,8 @@ export class TerritoryController {
     const territories = await this.territoryService.getAll();
     return territories.map((t) => ({
       userId: t.userId,
+      firstname: t.user?.firstname ?? '',
+      lastname: t.user?.lastname ?? '',
       color: t.color,
       tileCount: t.tileCount,
       areaKm2: t.areaKm2,

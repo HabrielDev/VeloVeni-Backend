@@ -14,7 +14,7 @@ export class Territory {
   userId: number;
 
   /** Array of "lat.xx,lng.xx" tile keys representing conquered grid cells */
-  @Column('simple-array', { nullable: true })
+  @Column('simple-json', { nullable: true })
   tiles: string[];
 
   @Column('int', { default: 0 })
