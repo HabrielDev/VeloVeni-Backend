@@ -22,6 +22,11 @@ export class TerritoryController {
     };
   }
 
+  @Get('tiles/crossings')
+  async getTileCrossings() {
+    return this.territoryService.getTileCrossings();
+  }
+
   @Get('all')
   async getAllTerritories() {
     const territories = await this.territoryService.getAll();

@@ -12,6 +12,12 @@ export class ActivityController {
     private readonly authService: AuthService,
   ) {}
 
+  @Post('recalculate')
+  async recalculate() {
+    const users = await this.activityService.recalculateAllFromDb();
+    return { ok: true, users };
+  }
+
   @Post('sync')
   async sync(@CurrentUser() user: JwtPayload) {
     const stravaToken = await this.authService.getValidStravaToken(user.sub);

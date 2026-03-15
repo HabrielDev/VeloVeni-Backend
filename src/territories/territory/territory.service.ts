@@ -128,6 +128,42 @@ export class TerritoryService {
     return this.territoryRepo.find({ relations: ['user'] });
   }
 
+  async getTileCrossings(): Promise<
+    Record<string, { userId: number; firstname: string; lastname: string; crossingCount: number; color: string }[]>
+  > {
+    const [crossings, territories] = await Promise.all([
+      this.crossingRepo.find({ relations: ['user'] }),
+      this.territoryRepo.find(),
+    ]);
+
+    const colorMap = new Map(territories.map((t) => [t.userId, t.color]));
+
+    // Sort descending by crossingCount, then by lastCrossedAt as tiebreaker
+    crossings.sort((a, b) =>
+      b.crossingCount !== a.crossingCount
+        ? b.crossingCount - a.crossingCount
+        : new Date(b.lastCrossedAt).getTime() - new Date(a.lastCrossedAt).getTime(),
+    );
+
+    const result: Record<
+      string,
+      { userId: number; firstname: string; lastname: string; crossingCount: number; color: string }[]
+    > = {};
+    for (const c of crossings) {
+      if (!result[c.tileKey]) result[c.tileKey] = [];
+      if (result[c.tileKey].length < 3) {
+        result[c.tileKey].push({
+          userId: c.userId,
+          firstname: c.user?.firstname ?? '',
+          lastname: c.user?.lastname ?? '',
+          crossingCount: c.crossingCount,
+          color: colorMap.get(c.userId) ?? '#FC4C02',
+        });
+      }
+    }
+    return result;
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────
   private isInGermany(lat: number, lng: number): boolean {
     return (

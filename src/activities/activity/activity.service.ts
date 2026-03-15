@@ -89,6 +89,24 @@ export class ActivityService {
     return res.json() as Promise<Record<string, unknown>[]>;
   }
 
+  // ─── Recalculate tile crossings for ALL users from existing DB activities ──
+  async recalculateAllFromDb(): Promise<number> {
+    const activities = await this.activityRepo.find({ where: { qualifying: true } });
+
+    const byUser = new Map<number, typeof activities>();
+    for (const a of activities) {
+      const list = byUser.get(a.userId) ?? [];
+      list.push(a);
+      byUser.set(a.userId, list);
+    }
+
+    for (const [userId, userActivities] of byUser) {
+      await this.territoryService.recalculateForUser(userId, userActivities);
+    }
+
+    return byUser.size;
+  }
+
   // ─── Get activities for user ──────────────────────────────────────────────
   async getForUser(userId: number): Promise<object[]> {
     const activities = await this.activityRepo.find({
