@@ -262,12 +262,14 @@ export class SeedService {
   async seed() {
     const existing = await this.userRepo.findOne({ where: { stravaId: '99001001' } });
     if (existing) {
-      console.log('Demo data already seeded — updating shareZones/shareRides for demo users...');
+      console.log('Demo data already seeded — fixing territory colors and privacy settings...');
       const demoIds = RIDERS.map((r) => r.stravaId);
       for (const stravaId of demoIds) {
         await this.userRepo.update({ stravaId }, { shareZones: true, shareRides: true });
       }
-      console.log('Demo users updated.');
+      // Clean up duplicate territory records and reassign correct colors
+      await this.resolveOwnership();
+      console.log('Demo data fixed.');
       return;
     }
 
@@ -379,6 +381,11 @@ export class SeedService {
     for (const userId of allUserIds) {
       const tiles = userTiles.get(userId) ?? [];
       const color = COLORS[userId % COLORS.length];
+
+      // Delete ALL existing territory records for this user (cleanup duplicates)
+      await this.territoryRepo.delete({ userId });
+
+      // Create a single clean record
       await this.territoryRepo.save(
         this.territoryRepo.create({
           userId,

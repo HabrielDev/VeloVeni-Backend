@@ -103,16 +103,18 @@ export class TerritoryService {
   }
 
   async getAll(): Promise<Territory[]> {
-    return this.territoryRepo.find({ relations: ['user'] });
+    const all = await this.territoryRepo.find({ relations: ['user'] });
+    return this.deduplicateByUser(all);
   }
 
   // Returns territories visible to the requesting user:
   // own territory always included + others where shareZones=true
   async getAllWithPrivacy(requestingUserId: number): Promise<Territory[]> {
-    const territories = await this.territoryRepo.find({ relations: ['user'] });
-    return territories.filter(
+    const all = await this.territoryRepo.find({ relations: ['user'] });
+    const filtered = all.filter(
       (t) => t.userId === requestingUserId || (t.user?.shareZones ?? true),
     );
+    return this.deduplicateByUser(filtered);
   }
 
   // Returns own territory + territories of Strava friends who share zones
@@ -120,12 +122,24 @@ export class TerritoryService {
     const following = await this.fetchStravaFollowing(stravaToken);
     const followingStravaIds = new Set(following.map((a: Record<string, unknown>) => String(a['id'])));
 
-    const territories = await this.territoryRepo.find({ relations: ['user'] });
-    return territories.filter(
+    const all = await this.territoryRepo.find({ relations: ['user'] });
+    const filtered = all.filter(
       (t) =>
         t.userId === requestingUserId ||
         (followingStravaIds.has(t.user?.stravaId ?? '') && (t.user?.shareZones ?? true)),
     );
+    return this.deduplicateByUser(filtered);
+  }
+
+  private deduplicateByUser(territories: Territory[]): Territory[] {
+    const byUser = new Map<number, Territory>();
+    for (const t of territories) {
+      const existing = byUser.get(t.userId);
+      if (!existing || t.tileCount > existing.tileCount) {
+        byUser.set(t.userId, t);
+      }
+    }
+    return Array.from(byUser.values());
   }
 
   private async fetchStravaFollowing(token: string): Promise<Record<string, unknown>[]> {
