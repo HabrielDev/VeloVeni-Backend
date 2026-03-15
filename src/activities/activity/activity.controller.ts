@@ -25,16 +25,19 @@ export class ActivityController {
     return { synced };
   }
 
+  @Get('friends')
+  async getFriendsActivities(@CurrentUser() user: JwtPayload) {
+    const stravaToken = await this.authService.getValidStravaToken(user.sub);
+    return this.activityService.getFriendsActivities(user.sub, stravaToken);
+  }
+
   @Get()
   async getAll(@CurrentUser() user: JwtPayload) {
     return this.activityService.getForUser(user.sub);
   }
 
   @Get(':stravaId/route')
-  async getRoute(
-    @CurrentUser() user: JwtPayload,
-    @Param('stravaId') stravaId: string,
-  ) {
+  async getRoute(@CurrentUser() user: JwtPayload, @Param('stravaId') stravaId: string) {
     const stravaToken = await this.authService.getValidStravaToken(user.sub);
     return this.activityService.getRoute(user.sub, stravaId, stravaToken);
   }

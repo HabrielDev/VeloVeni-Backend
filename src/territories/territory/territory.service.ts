@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Territory } from '../territory.entity';
 import { TileCrossing } from '../tile-crossing.entity';
 import { Activity } from '../../activities/activity.entity';
+import { User } from '../../users/user.entity';
 
 const TILE_STEP = 0.01;
 const TILE_AREA_KM2 = TILE_STEP * 111 * TILE_STEP * 73;
@@ -15,23 +16,20 @@ export class TerritoryService {
   constructor(
     @InjectRepository(Territory) private readonly territoryRepo: Repository<Territory>,
     @InjectRepository(TileCrossing) private readonly crossingRepo: Repository<TileCrossing>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
   // ─── Called after a user syncs activities ────────────────────────────────
   async recalculateForUser(userId: number, activities: Activity[]): Promise<void> {
-    // 1. Count crossings per tile for this user
     const crossingMap = new Map<string, { count: number; lastDate: Date }>();
 
     for (const activity of activities) {
       if (!activity.summaryPolyline) continue;
       const points = this.decodePolyline(activity.summaryPolyline);
-
-      // Each activity contributes at most 1 crossing per tile
       const tilesInActivity = new Set<string>();
       for (const [lat, lng] of points) {
         if (this.isInGermany(lat, lng)) tilesInActivity.add(this.toTileKey(lat, lng));
       }
-
       for (const key of tilesInActivity) {
         const existing = crossingMap.get(key);
         if (existing) {
@@ -43,7 +41,6 @@ export class TerritoryService {
       }
     }
 
-    // 2. Replace all TileCrossing rows for this user
     await this.crossingRepo.delete({ userId });
     if (crossingMap.size > 0) {
       const entities = Array.from(crossingMap.entries()).map(([key, data]) =>
@@ -57,16 +54,11 @@ export class TerritoryService {
       await this.crossingRepo.save(entities);
     }
 
-    // 3. Resolve global ownership and rebuild all Territory records
     await this.resolveOwnership();
   }
 
-  // ─── Determine winner of every tile across all users ─────────────────────
   private async resolveOwnership(): Promise<void> {
     const allCrossings = await this.crossingRepo.find();
-
-    // For each tile: find the user with the highest crossing count
-    // Tiebreaker: most recent lastCrossedAt
     const tileOwners = new Map<string, { userId: number; count: number; lastDate: Date }>();
 
     for (const c of allCrossings) {
@@ -76,15 +68,10 @@ export class TerritoryService {
         c.crossingCount > current.count ||
         (c.crossingCount === current.count && c.lastCrossedAt > current.lastDate);
       if (beats) {
-        tileOwners.set(c.tileKey, {
-          userId: c.userId,
-          count: c.crossingCount,
-          lastDate: c.lastCrossedAt,
-        });
+        tileOwners.set(c.tileKey, { userId: c.userId, count: c.crossingCount, lastDate: c.lastCrossedAt });
       }
     }
 
-    // Group owned tiles by userId
     const userTiles = new Map<number, string[]>();
     for (const [key, owner] of tileOwners) {
       const list = userTiles.get(owner.userId) ?? [];
@@ -92,9 +79,7 @@ export class TerritoryService {
       userTiles.set(owner.userId, list);
     }
 
-    // All users that have any crossings need a territory record (even if they own 0 tiles now)
     const allUserIds = new Set(allCrossings.map((c) => c.userId));
-
     for (const userId of allUserIds) {
       const tiles = userTiles.get(userId) ?? [];
       const color = COLORS[userId % COLORS.length];
@@ -107,25 +92,53 @@ export class TerritoryService {
         await this.territoryRepo.save(existing);
       } else {
         await this.territoryRepo.save(
-          this.territoryRepo.create({
-            userId,
-            tiles,
-            tileCount: tiles.length,
-            areaKm2: tiles.length * TILE_AREA_KM2,
-            color,
-          }),
+          this.territoryRepo.create({ userId, tiles, tileCount: tiles.length, areaKm2: tiles.length * TILE_AREA_KM2, color }),
         );
       }
     }
   }
 
-  // ─── Queries ─────────────────────────────────────────────────────────────
   async getForUser(userId: number): Promise<Territory | null> {
     return this.territoryRepo.findOne({ where: { userId } });
   }
 
   async getAll(): Promise<Territory[]> {
     return this.territoryRepo.find({ relations: ['user'] });
+  }
+
+  // Returns territories visible to the requesting user:
+  // own territory always included + others where shareZones=true
+  async getAllWithPrivacy(requestingUserId: number): Promise<Territory[]> {
+    const territories = await this.territoryRepo.find({ relations: ['user'] });
+    return territories.filter(
+      (t) => t.userId === requestingUserId || (t.user?.shareZones ?? true),
+    );
+  }
+
+  // Returns own territory + territories of Strava friends who share zones
+  async getFriendsTerritories(requestingUserId: number, stravaToken: string): Promise<Territory[]> {
+    const following = await this.fetchStravaFollowing(stravaToken);
+    const followingStravaIds = new Set(following.map((a: Record<string, unknown>) => String(a['id'])));
+
+    const territories = await this.territoryRepo.find({ relations: ['user'] });
+    return territories.filter(
+      (t) =>
+        t.userId === requestingUserId ||
+        (followingStravaIds.has(t.user?.stravaId ?? '') && (t.user?.shareZones ?? true)),
+    );
+  }
+
+  private async fetchStravaFollowing(token: string): Promise<Record<string, unknown>[]> {
+    try {
+      const res = await fetch(
+        'https://www.strava.com/api/v3/athlete/following?page=1&per_page=200',
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) return [];
+      return res.json() as Promise<Record<string, unknown>[]>;
+    } catch {
+      return [];
+    }
   }
 
   async getTileCrossings(): Promise<
@@ -138,7 +151,6 @@ export class TerritoryService {
 
     const colorMap = new Map(territories.map((t) => [t.userId, t.color]));
 
-    // Sort descending by crossingCount, then by lastCrossedAt as tiebreaker
     crossings.sort((a, b) =>
       b.crossingCount !== a.crossingCount
         ? b.crossingCount - a.crossingCount
@@ -164,7 +176,6 @@ export class TerritoryService {
     return result;
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
   private isInGermany(lat: number, lng: number): boolean {
     return (
       lat >= GERMANY_BOUNDS.latMin && lat <= GERMANY_BOUNDS.latMax &&

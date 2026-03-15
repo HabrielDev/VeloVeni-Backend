@@ -17,6 +17,12 @@ export class User {
   @Column({ nullable: true })
   profilePicture: string;
 
+  @Column({ default: true })
+  shareZones: boolean;
+
+  @Column({ default: false })
+  shareRides: boolean;
+
   @Column({ nullable: true })
   stravaAccessToken: string;
 

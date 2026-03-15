@@ -5,9 +5,10 @@ import { Activity } from '../activities/activity.entity';
 import { Territory } from '../territories/territory.entity';
 import { UserService } from './user/user.service';
 import { UserController } from './user/user.controller';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Activity, Territory])],
+  imports: [TypeOrmModule.forFeature([User, Activity, Territory]), AuthModule],
   providers: [UserService],
   controllers: [UserController],
   exports: [UserService],

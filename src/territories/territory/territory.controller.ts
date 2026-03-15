@@ -1,13 +1,16 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { TerritoryService } from './territory.service';
 import { JwtAuthGuard } from '../../common/guards/jwt.guard';
-import { CurrentUser } from '../../common/decorators/user.decorator';
-import { JwtPayload } from '../../common/decorators/user.decorator';
+import { CurrentUser, JwtPayload } from '../../common/decorators/user.decorator';
+import { AuthService } from '../../auth/auth.service';
 
 @Controller('territories')
 @UseGuards(JwtAuthGuard)
 export class TerritoryController {
-  constructor(private readonly territoryService: TerritoryService) {}
+  constructor(
+    private readonly territoryService: TerritoryService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get('me')
   async getMyTerritories(@CurrentUser() user: JwtPayload) {
@@ -27,9 +30,24 @@ export class TerritoryController {
     return this.territoryService.getTileCrossings();
   }
 
+  @Get('friends')
+  async getFriendsTerritories(@CurrentUser() user: JwtPayload) {
+    const stravaToken = await this.authService.getValidStravaToken(user.sub);
+    const territories = await this.territoryService.getFriendsTerritories(user.sub, stravaToken);
+    return territories.map((t) => ({
+      userId: t.userId,
+      firstname: t.user?.firstname ?? '',
+      lastname: t.user?.lastname ?? '',
+      color: t.color,
+      tileCount: t.tileCount,
+      areaKm2: t.areaKm2,
+      tiles: t.tiles ?? [],
+    }));
+  }
+
   @Get('all')
-  async getAllTerritories() {
-    const territories = await this.territoryService.getAll();
+  async getAllTerritories(@CurrentUser() user: JwtPayload) {
+    const territories = await this.territoryService.getAllWithPrivacy(user.sub);
     return territories.map((t) => ({
       userId: t.userId,
       firstname: t.user?.firstname ?? '',

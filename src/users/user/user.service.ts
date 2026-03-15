@@ -72,6 +72,15 @@ export class UserService {
     await this.userRepo.delete(userId);
   }
 
+  async getPrivacySettings(userId: number): Promise<{ shareZones: boolean; shareRides: boolean }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    return { shareZones: user?.shareZones ?? true, shareRides: user?.shareRides ?? false };
+  }
+
+  async updatePrivacySettings(userId: number, settings: { shareZones?: boolean; shareRides?: boolean }): Promise<void> {
+    await this.userRepo.update(userId, settings);
+  }
+
   // DSGVO Art. 20 — Recht auf Datenübertragbarkeit
   async exportData(userId: number): Promise<object> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
