@@ -262,7 +262,12 @@ export class SeedService {
   async seed() {
     const existing = await this.userRepo.findOne({ where: { stravaId: '99001001' } });
     if (existing) {
-      console.log('Demo data already seeded — skipping. To reseed, delete demo users first.');
+      console.log('Demo data already seeded — updating shareZones/shareRides for demo users...');
+      const demoIds = RIDERS.map((r) => r.stravaId);
+      for (const stravaId of demoIds) {
+        await this.userRepo.update({ stravaId }, { shareZones: true, shareRides: true });
+      }
+      console.log('Demo users updated.');
       return;
     }
 
@@ -276,6 +281,8 @@ export class SeedService {
           firstname: rider.firstname,
           lastname: rider.lastname,
           profilePicture: rider.profilePicture,
+          shareZones: true,
+          shareRides: true,
         }),
       );
       console.log(`  Created user: ${rider.firstname} ${rider.lastname} (id=${savedUser.id})`);

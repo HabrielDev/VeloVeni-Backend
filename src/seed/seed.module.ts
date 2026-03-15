@@ -20,7 +20,7 @@ import { SeedService } from './seed.service';
         password: cs.get('DB_PASSWORD'),
         database: cs.get('DB_DATABASE') ?? 'veloveni_db',
         entities: [User, Activity, Territory, TileCrossing],
-        synchronize: false,
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
