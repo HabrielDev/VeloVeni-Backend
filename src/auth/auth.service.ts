@@ -12,7 +12,14 @@ export class AuthService {
   ) {}
 
   async stravaCallback(code: string) {
-    const stravaData = await this.exchangeStravaCode(code);
+    let stravaData: any;
+    try {
+      stravaData = await this.exchangeStravaCode(code);
+    } catch (err) {
+      console.error('[Auth] exchangeStravaCode failed:', err);
+      throw err;
+    }
+    console.log('[Auth] Strava response keys:', Object.keys(stravaData));
     if (!stravaData.athlete) throw new UnauthorizedException('Invalid Strava response');
 
     const user = await this.usersService.upsertFromStrava(stravaData);
