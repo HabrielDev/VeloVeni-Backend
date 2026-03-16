@@ -11,6 +11,7 @@ import { UsersModule } from './users/users.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { TerritoriesModule } from './territories/territories.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { StravaWebhookModule } from './strava-webhook/strava-webhook.module';
 import { User } from './users/user.entity';
 import { Activity } from './activities/activity.entity';
 import { Territory } from './territories/territory.entity';
@@ -49,6 +50,7 @@ import { TileCrossing } from './territories/tile-crossing.entity';
     ActivitiesModule,
     TerritoriesModule,
     LeaderboardModule,
+    StravaWebhookModule,
   ],
   controllers: [AppController],
   providers: [
