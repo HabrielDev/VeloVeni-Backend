@@ -6,18 +6,21 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Security headers
-  app.use(helmet({
-    crossOriginEmbedderPolicy: false, // needed for Swagger UI
-    contentSecurityPolicy: false,     // configure per environment in production
-  }));
-
-  app.enableCors({
-    origin: true,
-    credentials: true,
+  // CORS must be set before Helmet
+  app.use((req: any, res: any, next: any) => {
+    const origin = req.headers.origin;
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
   });
 
-  console.log(`FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false,
+  }));
 
   const config = new DocumentBuilder()
     .setTitle('VeloVeni API')
