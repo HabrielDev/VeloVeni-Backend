@@ -13,9 +13,9 @@ export class ActivityController {
   ) {}
 
   @Post('recalculate')
-  async recalculate() {
-    const users = await this.activityService.recalculateAllFromDb();
-    return { ok: true, users };
+  async recalculate(@CurrentUser() user: JwtPayload) {
+    await this.activityService.recalculateForUserFromDb(user.sub);
+    return { ok: true };
   }
 
   @Post('sync')

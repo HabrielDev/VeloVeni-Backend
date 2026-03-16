@@ -1,4 +1,8 @@
 node_modules
 dist
-.env
 *.local
+
+# Environment files — never commit real credentials
+.env
+.env.*
+!.env.example

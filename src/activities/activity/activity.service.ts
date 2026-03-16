@@ -99,6 +99,12 @@ export class ActivityService {
     }
   }
 
+  async recalculateForUserFromDb(userId: number): Promise<void> {
+    const activities = await this.activityRepo.find({ where: { userId, qualifying: true } });
+    await this.territoryService.recalculateForUser(userId, activities);
+  }
+
+  /** Admin-only: recalculate territories for all users. Not exposed via public API. */
   async recalculateAllFromDb(): Promise<number> {
     const activities = await this.activityRepo.find({ where: { qualifying: true } });
     const byUser = new Map<number, typeof activities>();

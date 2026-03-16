@@ -23,7 +23,7 @@ export class AuthService {
     return {
       access_token,
       strava_access_token: stravaData.access_token,
-      strava_refresh_token: stravaData.refresh_token,
+      // strava_refresh_token is intentionally omitted — stored server-side only
       strava_expires_at: stravaData.expires_at,
       athlete: {
         id: stravaData.athlete.id,
