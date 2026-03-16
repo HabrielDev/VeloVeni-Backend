@@ -3,6 +3,7 @@ import { ActivityService } from './activity.service';
 import { JwtAuthGuard } from '../../common/guards/jwt.guard';
 import { CurrentUser, JwtPayload } from '../../common/decorators/user.decorator';
 import { AuthService } from '../../auth/auth.service';
+import { GetRouteDto } from './get-route.dto';
 
 @Controller('activities')
 @UseGuards(JwtAuthGuard)
@@ -37,8 +38,8 @@ export class ActivityController {
   }
 
   @Get(':stravaId/route')
-  async getRoute(@CurrentUser() user: JwtPayload, @Param('stravaId') stravaId: string) {
+  async getRoute(@CurrentUser() user: JwtPayload, @Param() params: GetRouteDto) {
     const stravaToken = await this.authService.getValidStravaToken(user.sub);
-    return this.activityService.getRoute(user.sub, stravaId, stravaToken);
+    return this.activityService.getRoute(user.sub, params.stravaId, stravaToken);
   }
 }
