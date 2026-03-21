@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Activity } from '../activity.entity';
 import { User } from '../../users/user.entity';
 import { TerritoryService } from '../../territories/territory/territory.service';
@@ -130,13 +130,15 @@ export class ActivityService {
   // Returns qualifying activities of Strava friends who have shareRides=true
   async getFriendsActivities(userId: number, stravaToken: string): Promise<object[]> {
     const following = await this.fetchStravaFollowing(stravaToken);
-    const followingStravaIds = new Set(following.map((a: Record<string, unknown>) => String(a['id'])));
+    const followingStravaIds = following.map((a: Record<string, unknown>) => String(a['id']));
 
-    // Find friends in DB who share rides
-    const allUsers = await this.userRepo.find();
-    const friendUserIds = allUsers
-      .filter((u) => u.id !== userId && followingStravaIds.has(u.stravaId) && u.shareRides)
-      .map((u) => u.id);
+    if (followingStravaIds.length === 0) return [];
+
+    // Only load friends that are in the app and have shareRides enabled
+    const friendUsers = await this.userRepo.find({
+      where: { stravaId: In(followingStravaIds), shareRides: true },
+    });
+    const friendUserIds = friendUsers.filter((u) => u.id !== userId).map((u) => u.id);
 
     if (friendUserIds.length === 0) return [];
 
@@ -145,13 +147,16 @@ export class ActivityService {
       order: { startDate: 'DESC' },
     });
 
-    return activities.map((a) => ({
-      ...this.toApiFormat(a),
-      userId: a.userId,
-      ownerName: allUsers.find((u) => u.id === a.userId)
-        ? `${allUsers.find((u) => u.id === a.userId)!.firstname} ${allUsers.find((u) => u.id === a.userId)!.lastname}`
-        : 'Freund',
-    }));
+    const userMap = new Map(friendUsers.map((u) => [u.id, u]));
+
+    return activities.map((a) => {
+      const owner = userMap.get(a.userId);
+      return {
+        ...this.toApiFormat(a),
+        userId: a.userId,
+        ownerName: owner ? `${owner.firstname} ${owner.lastname}` : 'Freund',
+      };
+    });
   }
 
   async getRoute(userId: number, stravaActivityId: string, stravaAccessToken: string): Promise<[number, number][]> {

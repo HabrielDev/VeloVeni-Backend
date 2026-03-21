@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Territory } from '../territory.entity';
 import { TileCrossing } from '../tile-crossing.entity';
 import { Activity } from '../../activities/activity.entity';
@@ -79,23 +79,28 @@ export class TerritoryService {
       userTiles.set(owner.userId, list);
     }
 
-    const allUserIds = new Set(allCrossings.map((c) => c.userId));
-    for (const userId of allUserIds) {
+    const allUserIds = Array.from(new Set(allCrossings.map((c) => c.userId)));
+
+    const existingTerritories = await this.territoryRepo.find({
+      where: { userId: In(allUserIds) },
+    });
+    const existingMap = new Map(existingTerritories.map((t) => [t.userId, t]));
+
+    const toSave = allUserIds.map((userId) => {
       const tiles = userTiles.get(userId) ?? [];
       const color = COLORS[userId % COLORS.length];
-      const existing = await this.territoryRepo.findOne({ where: { userId } });
+      const existing = existingMap.get(userId);
       if (existing) {
         existing.tiles = tiles;
         existing.tileCount = tiles.length;
         existing.areaKm2 = tiles.length * TILE_AREA_KM2;
         existing.color = color;
-        await this.territoryRepo.save(existing);
-      } else {
-        await this.territoryRepo.save(
-          this.territoryRepo.create({ userId, tiles, tileCount: tiles.length, areaKm2: tiles.length * TILE_AREA_KM2, color }),
-        );
+        return existing;
       }
-    }
+      return this.territoryRepo.create({ userId, tiles, tileCount: tiles.length, areaKm2: tiles.length * TILE_AREA_KM2, color });
+    });
+
+    await this.territoryRepo.save(toSave);
   }
 
   async getForUser(userId: number): Promise<Territory | null> {
